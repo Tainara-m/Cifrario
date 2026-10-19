@@ -83,7 +83,3 @@ Durante o desenvolvimento, foram feitos testes automatizados de ida e volta (enc
 
 - **Ideia, requisitos e orientação:** Tainara
 - **Desenvolvimento (código, interface e testes):** Claude, da Anthropic, a partir dessa orientação
-
-## Licença
-
-Defina a licença antes de publicar (por exemplo, MIT). Enquanto não houver um arquivo `LICENSE`, o código fica com todos os direitos reservados.
