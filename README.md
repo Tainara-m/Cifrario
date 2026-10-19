@@ -4,7 +4,7 @@ Aplicação web para encriptar mensagens por **substituição de caracteres**. V
 
 Funciona inteira no navegador, em um único arquivo HTML. Nada é enviado para servidor nenhum.
 
-> **Sobre a autoria:** este projeto foi desenvolvido pelo **Claude** (IA da Anthropic) a partir da orientação e dos requisitos da **Tainara**, que definiu a ideia, os níveis, as formas de encriptação e o formato de saída em PDF, e revisou o resultado ao longo do desenvolvimento.
+> **Sobre a autoria:** este projeto foi desenvolvido pelo **Claude** (IA da Anthropic) a partir da orientação e dos requisitos da **Tainara Martins**, que definiu a ideia, os níveis, as formas de encriptação e o formato de saída em PDF, e revisou o resultado ao longo do desenvolvimento.
 
 ## Como usar
 
@@ -81,5 +81,5 @@ Durante o desenvolvimento, foram feitos testes automatizados de ida e volta (enc
 
 ## Créditos
 
-- **Ideia, requisitos e orientação:** Tainara
+- **Ideia, requisitos e orientação:** Tainara Martins
 - **Desenvolvimento (código, interface e testes):** Claude, da Anthropic, a partir dessa orientação
