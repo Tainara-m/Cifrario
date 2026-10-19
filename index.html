@@ -1,0 +1,666 @@
+<title>Cifrário</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+/* Layout: coluna única de bancada de trabalho: abas, formulário em 3 passos, resultado em papel timbrado com a chave separada. */
+:root {
+  --bg: #eef1f6;
+  --surface: #ffffff;
+  --ink: #14213d;
+  --muted: #5b6680;
+  --line: #cbd3e3;
+  --accent: #0b7f82;
+  --accent-ink: #ffffff;
+  --accent-soft: #d9efef;
+  --paper: #f6f8fc;
+  --danger: #b3261e;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1627; --surface: #16203a; --ink: #e8ecf6; --muted: #98a3be; --line: #2a3659;
+    --accent: #3cc7c9; --accent-ink: #07202a; --accent-soft: #123a48; --paper: #101a31; --danger: #ff8a80;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1627; --surface: #16203a; --ink: #e8ecf6; --muted: #98a3be; --line: #2a3659;
+  --accent: #3cc7c9; --accent-ink: #07202a; --accent-soft: #123a48; --paper: #101a31; --danger: #ff8a80;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.5;
+  padding-block: 28px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.brand { min-width: 0; }
+.eyebrow { font: 600 12px/1 var(--font-mono); letter-spacing: .16em; text-transform: uppercase; color: var(--accent); }
+h1 { font: 700 clamp(34px, 7vw, 48px)/1 var(--font-display); letter-spacing: -.02em; margin: 8px 0 0; text-wrap: balance; }
+.tabs { display: inline-flex; border: 1.5px solid var(--ink); border-radius: 999px; padding: 3px; gap: 2px; }
+.tabs button {
+  font: 600 14px var(--font-body); border: 0; background: transparent; color: var(--ink);
+  padding: 8px 18px; border-radius: 999px; cursor: pointer;
+}
+.tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); }
+button:focus-visible, textarea:focus-visible, input:focus-visible, .opt:has(input:focus-visible) {
+  outline: 3px solid var(--accent); outline-offset: 2px;
+}
+.lede { color: var(--muted); max-width: 60ch; margin: 0; }
+
+section.step { display: flex; flex-direction: column; gap: 12px; }
+.step-title { display: flex; align-items: baseline; gap: 10px; margin: 0; font: 700 20px/1.2 var(--font-display); }
+.step-title small { font: 400 14px var(--font-body); color: var(--muted); }
+textarea, input[type="text"] {
+  width: 100%; font: 400 16px/1.5 var(--font-body); color: var(--ink);
+  background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; padding: 14px 16px;
+}
+textarea { min-height: 132px; resize: vertical; }
+input.mono, textarea.mono { font-family: var(--font-mono); font-size: 14px; }
+.count { align-self: flex-end; font: 400 12px var(--font-mono); color: var(--muted); margin-top: -4px; }
+
+.opts { display: grid; gap: 10px; }
+.opts.levels { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.opts.modes { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.opt { position: relative; min-width: 0; }
+.opt input { position: absolute; opacity: 0; inset: 0; cursor: pointer; margin: 0; }
+.opt .card {
+  height: 100%; background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px;
+  padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;
+}
+.opt input:checked + .card { border-color: var(--accent); box-shadow: inset 0 0 0 1.5px var(--accent); background: var(--accent-soft); }
+.card b { font: 700 17px var(--font-display); }
+.card span { color: var(--muted); font-size: 14px; }
+.card .meter { display: flex; gap: 4px; margin-bottom: 2px; }
+.meter i { width: 22px; height: 6px; border-radius: 3px; background: var(--line); }
+.meter i.on { background: var(--accent); }
+.card .sample { font: 400 20px/1.2 var(--font-mono); letter-spacing: .04em; overflow: hidden; white-space: nowrap; color: var(--ink); min-height: 24px; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.btn {
+  font: 600 16px var(--font-body); border-radius: 10px; padding: 13px 22px; cursor: pointer;
+  border: 1.5px solid var(--ink); background: transparent; color: var(--ink);
+}
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.small { font-size: 13px; padding: 7px 12px; border-radius: 8px; border-color: var(--line); }
+.btn[disabled] { opacity: .45; cursor: not-allowed; }
+.msg { font-size: 14px; color: var(--muted); min-height: 20px; }
+.msg.err { color: var(--danger); }
+
+.sheet { background: var(--surface); border: 1.5px solid var(--ink); border-radius: 4px; display: flex; flex-direction: column; }
+.sheet.stale .body { opacity: .4; }
+.sheet-head {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px;
+  padding: 12px 18px; border-bottom: 1.5px solid var(--ink); font: 400 12px var(--font-mono);
+  letter-spacing: .04em; text-transform: uppercase; color: var(--muted);
+}
+.sheet-head b { color: var(--ink); font-weight: 600; }
+.body { padding: 18px; display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.field-label { font: 600 12px var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.cipher {
+  background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 14px;
+  font: 400 22px/1.55 var(--font-mono); word-break: break-all; overflow-wrap: anywhere;
+  max-height: 260px; overflow: auto;
+}
+.cipher.bin { font-size: 14px; letter-spacing: .02em; word-break: normal; }
+.cipher.emo { font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", var(--font-mono); letter-spacing: .08em; }
+.keybox { background: var(--paper); border: 1.5px dashed var(--accent); border-radius: 6px; padding: 14px; font: 600 15px/1.7 var(--font-mono); overflow-wrap: anywhere; user-select: all; }
+.hint { font-size: 14px; color: var(--muted); margin: 0; }
+.warn { font-size: 14px; border-left: 3px solid var(--accent); padding: 6px 0 6px 12px; color: var(--muted); margin: 0; }
+.out { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; white-space: pre-wrap; overflow-wrap: anywhere; min-height: 52px; }
+[role="tabpanel"] { display: flex; flex-direction: column; gap: 28px; }
+@media (max-width: 480px) { .cipher { font-size: 19px; } .tabs button { padding: 8px 14px; } }
+@media (prefers-reduced-motion: no-preference) { .sheet .body { transition: opacity .2s; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="eyebrow">Mensagens secretas</div>
+      <h1>Cifrário</h1>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Modo">
+      <button role="tab" id="tab-enc" aria-selected="true" aria-controls="panel-enc">Encriptar</button>
+      <button role="tab" id="tab-dec" aria-selected="false" aria-controls="panel-dec">Decriptar</button>
+    </div>
+  </header>
+
+  <div id="panel-enc" role="tabpanel" aria-labelledby="tab-enc">
+    <p class="lede">Escreva a mensagem, escolha o nível e a forma de encriptar. Cada caractere vira um símbolo. Você recebe um PDF com a mensagem encriptada e, em outras páginas, a chave: a tabela que troca cada símbolo pelo caractere original.</p>
+
+    <section class="step">
+      <h2 class="step-title">1. Mensagem <small>o texto que será escondido</small></h2>
+      <textarea id="text" maxlength="3000" aria-label="Mensagem para encriptar">Encontro na biblioteca às 14h30. Traga o caderno vermelho e não conte a ninguém!</textarea>
+      <div class="count" id="count">0 / 3000</div>
+      <p class="hint">Aceita letras, números, acentos, espaços, quebras de linha e a pontuação comum. Emojis dentro do texto não são aceitos.</p>
+    </section>
+
+    <section class="step">
+      <h2 class="step-title">2. Nível <small>quanto mais difícil, mais difícil de quebrar</small></h2>
+      <div class="opts levels" id="levels" role="radiogroup" aria-label="Nível de encriptação"></div>
+    </section>
+
+    <section class="step">
+      <h2 class="step-title">3. Forma <small>com o que a mensagem será escrita</small></h2>
+      <div class="opts modes" id="modes" role="radiogroup" aria-label="Forma de encriptação"></div>
+    </section>
+
+    <div class="actions">
+      <button class="btn primary" id="go" type="button">Encriptar</button>
+      <span class="msg" id="enc-msg" role="status"></span>
+    </div>
+
+    <div class="sheet" id="sheet" hidden>
+      <div class="sheet-head"><span id="meta-left"></span><span id="meta-right"></span></div>
+      <div class="body">
+        <div>
+          <div class="field-label"><span>Mensagem encriptada</span><button class="btn small" id="copy-msg" type="button">Copiar</button></div>
+          <div class="cipher" id="cipher" aria-live="polite"></div>
+        </div>
+        <div>
+          <div class="field-label"><span>Chave de encriptação</span><button class="btn small" id="copy-key" type="button">Copiar</button></div>
+          <div class="keybox" id="key"></div>
+        </div>
+        <p class="warn" id="level-note"></p>
+        <div class="actions">
+          <button class="btn primary" id="pdf" type="button">Baixar PDF</button>
+          <span class="msg" id="pdf-msg" role="status"></span>
+        </div>
+        <p class="hint">No PDF, a mensagem fica na primeira página e a chave (com a tabela completa) nas seguintes, para você entregar cada parte por um caminho diferente.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="panel-dec" role="tabpanel" aria-labelledby="tab-dec" hidden>
+    <p class="lede">Cole a mensagem encriptada e o código da chave. Cada símbolo é trocado pelo caractere da tabela. Se o texto sair sem sentido, a chave é de outra mensagem.</p>
+    <section class="step">
+      <h2 class="step-title">Mensagem encriptada</h2>
+      <textarea id="dec-text" class="mono" aria-label="Mensagem encriptada" placeholder="Cole aqui a mensagem"></textarea>
+    </section>
+    <section class="step">
+      <h2 class="step-title">Código da chave</h2>
+      <input type="text" id="dec-key" class="mono" aria-label="Código da chave" placeholder="Exemplo: E2-D329B2EC 00766062 ..." autocomplete="off" spellcheck="false">
+    </section>
+    <div class="actions">
+      <button class="btn primary" id="dec-go" type="button">Decriptar</button>
+      <span class="msg" id="dec-msg" role="status"></span>
+    </div>
+    <section class="step" id="dec-out-wrap" hidden>
+      <h2 class="step-title">Texto original</h2>
+      <div class="out" id="dec-out"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+/* ===== Cifrário: núcleo (substituição de caracteres + PDF) ===== */
+const WCRYPTO = globalThis.crypto;
+
+function cpRanges(ranges, skip) {
+  const out = [];
+  for (const [a, b] of ranges) {
+    for (let i = a; i <= b; i++) if (!skip || !skip.includes(i)) out.push(String.fromCodePoint(i));
+  }
+  return out;
+}
+
+/* Caracteres que podem ser encriptados */
+const PLAIN = (function () {
+  const out = [' ', '\n'];
+  for (let c = 97; c <= 122; c++) out.push(String.fromCharCode(c));
+  for (let c = 65; c <= 90; c++) out.push(String.fromCharCode(c));
+  for (let c = 48; c <= 57; c++) out.push(String.fromCharCode(c));
+  out.push(...Array.from('.,;:!?\'"-()[]{}/\\@#$%&*+=_<>~^|`€°ºª§¿¡'));
+  out.push(...Array.from('áàâãäçéèêëíìîïñóòôõöúùûüÁÀÂÃÄÇÉÈÊËÍÌÎÏÑÓÒÔÕÖÚÙÛÜ'));
+  return out;
+})();
+const PLAIN_SET = new Set(PLAIN);
+
+function normalizeText(t) {
+  return String(t)
+    .replace(/\r\n?/g, '\n').replace(/\t/g, ' ').replace(/ /g, ' ')
+    .replace(/[“”«»]/g, '"').replace(/[‘’]/g, "'")
+    .replace(/[–—]/g, '-').replace(/…/g, '...').normalize('NFC');
+}
+
+const MODES = {
+  E: { name: 'Emojis', short: 'emojis' },
+  S: { name: 'Símbolos', short: 'símbolos' },
+  C: { name: 'Caracteres', short: 'caracteres' },
+  B: { name: 'Binário', short: 'binário' }
+};
+const LEVELS = {
+  1: { name: 'Fácil', keyBytes: 2 },
+  2: { name: 'Moderado', keyBytes: 16 },
+  3: { name: 'Difícil', keyBytes: 16 }
+};
+
+const TOKEN_CACHE = {};
+function bitsFor(level) { return level === 3 ? 10 : 8; }
+function tokensFor(mode, level) {
+  const id = mode + (mode === 'B' ? bitsFor(level) : '');
+  if (TOKEN_CACHE[id]) return TOKEN_CACHE[id];
+  let t;
+  if (mode === 'E') {
+    t = cpRanges([[0x1F300, 0x1F320], [0x1F330, 0x1F37D], [0x1F380, 0x1F393], [0x1F3A0, 0x1F3C4],
+      [0x1F400, 0x1F43E], [0x1F440, 0x1F440], [0x1F442, 0x1F4FC], [0x1F4FF, 0x1F4FF]]);
+  } else if (mode === 'S') {
+    t = cpRanges([[0x2190, 0x21FF], [0x2200, 0x227F], [0x25A0, 0x25FF]]);
+  } else if (mode === 'C') {
+    t = cpRanges([[0xC0, 0xFF], [0x100, 0x17F], [0x391, 0x3A1], [0x3A3, 0x3A9], [0x3B1, 0x3C9], [0x400, 0x44F]], [0xD7, 0xF7]);
+  } else {
+    const bits = bitsFor(level);
+    t = Array.from({ length: 1 << bits }, (_, i) => i.toString(2).padStart(bits, '0'));
+  }
+  return (TOKEN_CACHE[id] = t);
+}
+function sampleTokens(mode, n) { return tokensFor(mode, 2).slice(0, n); }
+
+/* ---------- utilidades ---------- */
+function toHex(bytes) { return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('').toUpperCase(); }
+function fromHex(hex) {
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.substr(i * 2, 2), 16);
+  return out;
+}
+function sfc32(a, b, c, d) {
+  return function () {
+    a >>>= 0; b >>>= 0; c >>>= 0; d >>>= 0;
+    let t = (a + b) | 0;
+    a = b ^ (b >>> 9); b = (c + (c << 3)) | 0; c = (c << 21) | (c >>> 11);
+    d = (d + 1) | 0; t = (t + d) | 0; c = (c + t) | 0;
+    return (t >>> 0) / 4294967296;
+  };
+}
+function rngFromBytes(k) {
+  const w = i => ((k[i] << 24) | (k[i + 1] << 16) | (k[i + 2] << 8) | k[i + 3]) >>> 0;
+  const rng = sfc32(w(0), w(4), w(8), w(12));
+  for (let i = 0; i < 16; i++) rng();
+  return rng;
+}
+function shuffle(arr, rng) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+  }
+  return arr;
+}
+function randIndex(n) {
+  const a = new Uint32Array(1);
+  WCRYPTO.getRandomValues(a);
+  return a[0] % n;
+}
+
+/* ---------- tabela de substituição ---------- */
+function derive(mode, level, keyBytes) {
+  const T = tokensFor(mode, level);
+  const P = PLAIN;
+  const fwd = new Map(), rev = new Map();
+  let h = 1;
+  if (level === 1) {
+    const off = (keyBytes[0] << 8) | keyBytes[1];
+    if (off < 1 || off >= T.length) throw new Error('Chave inválida.');
+    P.forEach((ch, i) => { const tk = T[(i + off) % T.length]; fwd.set(ch, [tk]); rev.set(tk, ch); });
+  } else {
+    const S = shuffle(T.slice(), rngFromBytes(keyBytes));
+    h = level === 3 ? Math.min(3, Math.floor(T.length / P.length)) : 1;
+    P.forEach((ch, i) => {
+      const list = S.slice(i * h, i * h + h);
+      fwd.set(ch, list);
+      list.forEach(tk => rev.set(tk, ch));
+    });
+  }
+  return { mode, level, T, fwd, rev, h };
+}
+
+function parseKey(text) {
+  const clean = String(text).replace(/[\s​﻿]/g, '').toUpperCase();
+  const m = /^([ESCB])([123])-([0-9A-F]+)$/.exec(clean);
+  if (!m) throw new Error('Código de chave inválido. Ele começa com uma letra e um número, como E2-.');
+  const mode = m[1], level = Number(m[2]);
+  const hex = m[3];
+  if (hex.length !== LEVELS[level].keyBytes * 2) {
+    throw new Error('A chave está incompleta ou tem caracteres a mais. Copie o código inteiro.');
+  }
+  return { mode, level, keyBytes: fromHex(hex), key: mode + level + '-' + hex };
+}
+
+function formatKeyLines(key, groupsPerLine) {
+  const dash = key.indexOf('-');
+  const prefix = key.slice(0, dash + 1);
+  const groups = key.slice(dash + 1).match(/.{1,8}/g) || [];
+  const lines = [];
+  for (let i = 0; i < groups.length; i += groupsPerLine) lines.push(groups.slice(i, i + groupsPerLine).join(' '));
+  if (!lines.length) lines.push('');
+  lines[0] = prefix + lines[0];
+  return lines;
+}
+
+/* ---------- API principal ---------- */
+async function encryptMessage(text, mode, level) {
+  const chars = Array.from(normalizeText(text));
+  const bad = [...new Set(chars.filter(c => !PLAIN_SET.has(c)))];
+  if (bad.length) {
+    throw new Error('Estes caracteres não podem ser encriptados: ' + bad.slice(0, 8).join(' ') + (bad.length > 8 ? ' …' : '') +
+      '. Use letras, números, acentos e pontuação comuns.');
+  }
+  const keyBytes = WCRYPTO.getRandomValues(new Uint8Array(LEVELS[level].keyBytes));
+  if (level === 1) {
+    const v = 1 + (((keyBytes[0] << 8) | keyBytes[1]) % (tokensFor(mode, level).length - 1));
+    keyBytes[0] = v >> 8; keyBytes[1] = v & 255;
+  }
+  const d = derive(mode, level, keyBytes);
+  const tokens = chars.map(ch => { const l = d.fwd.get(ch); return l.length === 1 ? l[0] : l[randIndex(l.length)]; });
+  return {
+    mode, level, d, tokens,
+    message: mode === 'B' ? tokens.join(' ') : tokens.join(''),
+    key: mode + level + '-' + toHex(keyBytes)
+  };
+}
+
+async function decryptMessage(messageText, keyText) {
+  const k = parseKey(keyText);
+  const d = derive(k.mode, k.level, k.keyBytes);
+  const clean = String(messageText).replace(/[\s​﻿]/g, '');
+  if (!clean) throw new Error('Cole a mensagem encriptada.');
+  let tokens;
+  if (k.mode === 'B') {
+    const bits = bitsFor(k.level);
+    if (/[^01]/.test(clean)) throw new Error('Esta chave é de binário, mas a mensagem tem outros caracteres além de 0 e 1.');
+    if (clean.length % bits !== 0) throw new Error('O binário está incompleto: cada código tem ' + bits + ' dígitos.');
+    tokens = clean.match(new RegExp('.{' + bits + '}', 'g'));
+  } else {
+    tokens = Array.from(clean);
+  }
+  let out = '';
+  for (let i = 0; i < tokens.length; i++) {
+    const ch = d.rev.get(tokens[i]);
+    if (ch === undefined) {
+      throw new Error('O símbolo «' + tokens[i] + '» (posição ' + (i + 1) + ') não está na tabela desta chave. Confira se a chave é desta mensagem.');
+    }
+    out += ch;
+  }
+  return out;
+}
+
+/* ---------- PDF ---------- */
+function charLabel(ch) { return ch === ' ' ? 'espaço' : ch === '\n' ? 'linha nova' : ch; }
+
+function buildPdf(jsPDF, r, glyphImage) {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const W = 210, H = 297, M = 18, CW = W - 2 * M;
+  const INK = [20, 33, 61], TEAL = [11, 127, 130], GREY = [100, 110, 132], PAPER = [236, 240, 246], LINE = [200, 208, 224];
+  const modeName = MODES[r.mode].name, levelName = LEVELS[r.level].name;
+  const isImg = r.mode !== 'B';
+  const date = new Date().toLocaleDateString('pt-BR');
+  const limit = H - M - 8;
+  doc.setProperties({ title: 'Mensagem encriptada', subject: 'Gerado pelo Cifrário' });
+  const img = (g) => glyphImage(g, r.mode === 'E');
+  const alias = (g) => r.mode + g.codePointAt(0).toString(16);
+
+  const header = (title, sub) => {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...TEAL); doc.text('CIFRÁRIO', M, M);
+    doc.setFontSize(22); doc.setTextColor(...INK); doc.text(title, M, M + 11);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(...GREY); doc.text(sub, M, M + 18);
+    doc.setDrawColor(...INK); doc.setLineWidth(0.4); doc.line(M, M + 22, W - M, M + 22);
+    return M + 31;
+  };
+  const label = (t, y) => { doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...GREY); doc.text(t, M, y); };
+
+  /* página 1: mensagem */
+  const unit = r.mode === 'B' ? 'códigos' : 'símbolos';
+  let y = header('Mensagem encriptada', 'Modo ' + modeName + '   ·   Nível ' + levelName + '   ·   ' + r.tokens.length + ' ' + unit + '   ·   ' + date);
+  label('MENSAGEM', y); y += 7;
+  if (isImg) {
+    const cell = 7.2, cols = Math.floor(CW / cell), size = 5.6;
+    r.tokens.forEach((g, i) => {
+      const col = i % cols;
+      if (col === 0 && i > 0) y += cell;
+      if (col === 0 && y + cell > limit) { doc.addPage(); y = M; }
+      doc.addImage(img(g), 'PNG', M + col * cell + (cell - size) / 2, y + (cell - size) / 2, size, size, alias(g));
+    });
+    y += cell;
+  } else {
+    doc.setFont('courier', 'normal'); doc.setFontSize(10.5); doc.setTextColor(...INK);
+    const lines = doc.splitTextToSize(r.message, CW);
+    for (const ln of lines) {
+      if (y + 5.6 > limit) { doc.addPage(); y = M; doc.setFont('courier', 'normal'); doc.setFontSize(10.5); doc.setTextColor(...INK); }
+      doc.text(ln, M, y); y += 5.6;
+    }
+  }
+
+  /* chave */
+  doc.addPage();
+  y = header('Chave de encriptação', 'Entregue estas páginas separadas da mensagem.');
+  label('CÓDIGO DA CHAVE (para o Cifrário)', y); y += 4;
+  const kl = formatKeyLines(r.key, 4);
+  const bh = kl.length * 7.5 + 7;
+  doc.setFillColor(...PAPER); doc.setDrawColor(...LINE); doc.setLineWidth(0.3);
+  doc.roundedRect(M, y, CW, bh, 1.5, 1.5, 'FD');
+  doc.setFont('courier', 'bold'); doc.setFontSize(13); doc.setTextColor(...INK);
+  kl.forEach((ln, i) => doc.text(ln, M + 5, y + 8.2 + i * 7.5));
+  y += bh + 9;
+
+  label('COMO DECIFRAR', y); y += 6;
+  const para = (txt) => {
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5); doc.setTextColor(...INK);
+    doc.splitTextToSize(txt, CW).forEach(l => { doc.text(l, M, y); y += 5.4; });
+    y += 2;
+  };
+  para('Para cada ' + (r.mode === 'B' ? 'código' : 'símbolo') + ' da mensagem, procure-o na tabela abaixo e escreva o caractere que aparece depois do sinal de igual. Espaços e quebras de linha também são trocados por símbolos: eles aparecem na tabela como «espaço» e «linha nova».');
+  if (r.level === 1) para('Nível fácil: a tabela segue sempre a mesma ordem, só deslocada, e cada caractere tem um único símbolo.');
+  else if (r.level === 2) para('Nível moderado: a tabela é embaralhada, e cada caractere tem um único símbolo.');
+  else para('Nível difícil: a tabela é embaralhada e cada caractere tem ' + r.d.h + ' símbolos diferentes. Todos aparecem na tabela e valem o mesmo caractere.');
+
+  /* tabela símbolo = caractere, na ordem dos símbolos */
+  const entries = r.d.T.filter(t => r.d.rev.has(t)).map(t => [t, r.d.rev.get(t)]);
+  const isBin = r.mode === 'B';
+  const cols = isBin ? 4 : 6, cw = CW / cols, rh = isBin ? 7.4 : 9;
+  const tableHead = (cont) => { label(cont ? 'TABELA DE SUBSTITUIÇÃO (continuação)' : 'TABELA DE SUBSTITUIÇÃO', y); y += 4; };
+  if (y + 30 > limit) { doc.addPage(); y = M; }
+  tableHead(false);
+  doc.setDrawColor(...LINE); doc.setLineWidth(0.25);
+  for (let i = 0; i < entries.length; i += cols) {
+    if (y + rh > limit) { doc.addPage(); y = M; tableHead(true); doc.setDrawColor(...LINE); doc.setLineWidth(0.25); }
+    for (let c = 0; c < cols && i + c < entries.length; c++) {
+      const [tk, ch] = entries[i + c];
+      const x = M + c * cw;
+      doc.rect(x, y, cw, rh);
+      let tx;
+      if (isBin) {
+        doc.setFont('courier', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...INK);
+        doc.text(tk, x + 1.6, y + 5);
+        tx = x + 1.6 + doc.getTextWidth(tk) + 2;
+      } else {
+        doc.addImage(img(tk), 'PNG', x + 1.6, y + (rh - 6.2) / 2, 6.2, 6.2, alias(tk));
+        tx = x + 9.6;
+      }
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...GREY);
+      doc.text('=', tx, y + rh / 2 + 1.3);
+      tx += 3.6;
+      if (ch === ' ' || ch === '\n') {
+        doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5); doc.setTextColor(...TEAL);
+        doc.text(charLabel(ch), tx, y + rh / 2 + 1.1);
+      } else {
+        doc.setFont('courier', 'bold'); doc.setFontSize(12.5); doc.setTextColor(...INK);
+        doc.text(ch, tx, y + rh / 2 + 1.8);
+      }
+    }
+    y += rh;
+  }
+
+  const n = doc.getNumberOfPages();
+  for (let p = 1; p <= n; p++) {
+    doc.setPage(p);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...GREY);
+    doc.text('Cifrário   ·   página ' + p + ' de ' + n, W / 2, H - 10, { align: 'center' });
+  }
+  return doc;
+}
+
+</script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var LEVEL_INFO = {
+    1: { desc: 'Tabela em ordem fixa, só deslocada. Cada caractere tem um símbolo.', note: 'Nível fácil serve para brincadeiras e jogos. Quem observar o padrão consegue decifrar sem a chave.' },
+    2: { desc: 'Tabela embaralhada. Cada caractere tem um símbolo, e espaços também viram símbolos.', note: 'Nível moderado segura curiosos. Um texto longo ainda pode ser quebrado por contagem de letras.' },
+    3: { desc: 'Tabela embaralhada em que cada caractere tem 2 ou 3 símbolos diferentes. A contagem de letras deixa de funcionar.', note: 'Nível difícil esconde o padrão das letras, mas continua sendo uma cifra de substituição, não criptografia de banco. Não use para segredos importantes.' }
+  };
+  var MODE_INFO = { E: 'Figuras coloridas', S: 'Estrelas e sinais', C: 'Letras com acento', B: 'Zeros e uns' };
+  var state = { level: 2, mode: 'E', result: null };
+  var glyphCache = {};
+
+  function sampleOf(mode) {
+    if (mode === 'B') return '0100 1000 01';
+    return sampleTokens(mode, 8).join('');
+  }
+
+  function buildOptions() {
+    var lv = $('levels'), md = $('modes');
+    [1, 2, 3].forEach(function (n) {
+      var l = document.createElement('label'); l.className = 'opt';
+      l.innerHTML = '<input type="radio" name="level" value="' + n + '"' + (n === state.level ? ' checked' : '') + '>' +
+        '<div class="card"><div class="meter" aria-hidden="true">' +
+        [1, 2, 3].map(function (i) { return '<i class="' + (i <= n ? 'on' : '') + '"></i>'; }).join('') +
+        '</div><b>' + LEVELS[n].name + '</b><span>' + LEVEL_INFO[n].desc + '</span></div>';
+      lv.appendChild(l);
+    });
+    ['E', 'S', 'C', 'B'].forEach(function (m) {
+      var l = document.createElement('label'); l.className = 'opt';
+      l.innerHTML = '<input type="radio" name="mode" value="' + m + '"' + (m === state.mode ? ' checked' : '') + '>' +
+        '<div class="card"><div class="sample" aria-hidden="true"></div><b>' + MODES[m].name + '</b><span>' + MODE_INFO[m] + '</span></div>';
+      l.querySelector('.sample').textContent = sampleOf(m);
+      md.appendChild(l);
+    });
+  }
+
+  function markStale() {
+    if (state.result) { $('sheet').classList.add('stale'); $('pdf').disabled = true; $('enc-msg').textContent = 'Algo mudou. Clique em Encriptar para atualizar o resultado.'; $('enc-msg').className = 'msg'; }
+  }
+
+  function glyphImage(g, emoji) {
+    var k = (emoji ? 'e' : 's') + g;
+    if (glyphCache[k]) return glyphCache[k];
+    var c = document.createElement('canvas'); c.width = 96; c.height = 96;
+    var x = c.getContext('2d');
+    x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillStyle = '#14213d';
+    x.font = emoji
+      ? '64px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'
+      : '66px "Segoe UI Symbol","Noto Sans Symbols2","Noto Sans Symbols","DejaVu Sans",sans-serif';
+    x.fillText(g, 48, 52);
+    return (glyphCache[k] = c.toDataURL('image/png'));
+  }
+
+  function show(r) {
+    state.result = r;
+    var sheet = $('sheet');
+    sheet.hidden = false; sheet.classList.remove('stale');
+    var c = $('cipher');
+    c.className = 'cipher' + (r.mode === 'B' ? ' bin' : '') + (r.mode === 'E' ? ' emo' : '');
+    c.textContent = r.message;
+    var kl = formatKeyLines(r.key, 4);
+    $('key').textContent = kl.join('\n');
+    $('key').style.whiteSpace = 'pre-wrap';
+    $('meta-left').innerHTML = 'Modo <b>' + MODES[r.mode].name + '</b> · Nível <b>' + LEVELS[r.level].name + '</b>';
+    $('meta-right').textContent = r.tokens.length + (r.mode === 'B' ? ' códigos' : ' símbolos');
+    $('level-note').textContent = LEVEL_INFO[r.level].note;
+    $('pdf').disabled = false;
+    $('pdf-msg').textContent = ''; $('enc-msg').textContent = '';
+  }
+
+  async function run() {
+    var text = $('text').value;
+    var m = $('enc-msg');
+    if (!text.trim()) { m.textContent = 'Escreva uma mensagem para encriptar.'; m.className = 'msg err'; $('text').focus(); return; }
+    try {
+      show(await encryptMessage(text, state.mode, state.level));
+    } catch (e) { m.textContent = 'Não foi possível encriptar: ' + e.message; m.className = 'msg err'; }
+  }
+
+  async function copy(text, btn) {
+    var old = btn.textContent;
+    try { await navigator.clipboard.writeText(text); btn.textContent = 'Copiado'; }
+    catch (e) { btn.textContent = 'Selecione e copie'; }
+    setTimeout(function () { btn.textContent = old; }, 1600);
+  }
+
+  async function savePdf() {
+    var r = state.result, m = $('pdf-msg');
+    m.className = 'msg';
+    if (!r) return;
+    if (!(window.jspdf && window.jspdf.jsPDF)) { m.textContent = 'A biblioteca de PDF não carregou. Recarregue a página.'; m.className = 'msg err'; return; }
+    try {
+      var doc = buildPdf(window.jspdf.jsPDF, r, glyphImage);
+      var blob = doc.output('blob');
+      var dl = null;
+      try {
+        if (window.claude && window.claude.use) {
+          dl = await Promise.race([window.claude.use('downloads'), new Promise(function (ok) { setTimeout(function () { ok(null); }, 2000); })]);
+        }
+      } catch (e) { dl = null; }
+      var name = 'mensagem-encriptada-' + MODES[r.mode].short + '-' + LEVELS[r.level].name.toLowerCase() + '.pdf';
+      if (dl) {
+        await dl.save({ filename: name, data: blob });
+      } else {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = name;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+      }
+      m.textContent = 'PDF salvo.';
+    } catch (e) {
+      if (e && e.code === 'declined') m.textContent = 'Download cancelado.';
+      else { m.textContent = 'Não foi possível salvar o PDF.'; m.className = 'msg err'; }
+    }
+  }
+
+  async function decrypt() {
+    var m = $('dec-msg'), out = $('dec-out');
+    m.className = 'msg'; m.textContent = '';
+    try {
+      var t = await decryptMessage($('dec-text').value, $('dec-key').value);
+      out.textContent = t; $('dec-out-wrap').hidden = false;
+    } catch (e) {
+      $('dec-out-wrap').hidden = true;
+      m.textContent = e.message; m.className = 'msg err';
+    }
+  }
+
+  function setTab(which) {
+    var enc = which === 'enc';
+    $('tab-enc').setAttribute('aria-selected', enc); $('tab-dec').setAttribute('aria-selected', !enc);
+    $('panel-enc').hidden = !enc; $('panel-dec').hidden = enc;
+  }
+
+  buildOptions();
+  var t = $('text'), cnt = $('count');
+  function upCount() { cnt.textContent = t.value.length + ' / 3000'; }
+  t.addEventListener('input', function () { upCount(); markStale(); });
+  upCount();
+  document.addEventListener('change', function (e) {
+    if (e.target.name === 'level') { state.level = Number(e.target.value); markStale(); }
+    if (e.target.name === 'mode') { state.mode = e.target.value; markStale(); }
+  });
+  $('go').addEventListener('click', run);
+  $('pdf').addEventListener('click', savePdf);
+  $('copy-msg').addEventListener('click', function (e) { if (state.result) copy(state.result.message, e.currentTarget); });
+  $('copy-key').addEventListener('click', function (e) { if (state.result) copy(state.result.key, e.currentTarget); });
+  $('dec-go').addEventListener('click', decrypt);
+  $('tab-enc').addEventListener('click', function () { setTab('enc'); });
+  $('tab-dec').addEventListener('click', function () { setTab('dec'); });
+  run();
+})();
+</script>
